@@ -17,8 +17,7 @@ ERROR_CODES = {
 
 def setup_argparse():
     parser = argparse.ArgumentParser(add_help=False)
-    #parser.add_argument('-X', '--xlog_path', help="path to xlog directory")
-    parser.add_argument('-x', '--xlog_segment', action='append', help="xlog segment to analyze")
+    parser.add_argument('xlog_segment', nargs="*")
     parser.add_argument('--pg_xlogdump', help="path to pg_xlogdump")
     parser.add_argument('-v', '--verbose', action='count', help="verbose output")
     parser.add_argument('-t', '--top_relations', action='count', help="print top relations")
