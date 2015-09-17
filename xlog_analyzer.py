@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import argparse
 import os
 import sys
@@ -48,39 +50,65 @@ def read_xlog_file(file_path, args):
 
 def init_xlog_stats():
     xlog_stats = {
-        "count" : 0,
-        "n_heap" : 0,
-        "n_heap2" : 0,
-        "n_btree" : 0,
-        "n_other" : 0,
-        "n_relation" : 0,
-        "n_page" : 0,
-        "n_distinct_relation" : 0,
-        "n_distinct_page" : 0,
-        "n_insert" : 0,
-        "n_update" : 0,
-        "n_hotupdate" : 0,
-        "n_delete" : 0,
-        "relations" : {}
+        "count"                      : 0,
+        "n_heap"                     : 0,
+        "n_heap2"                    : 0,
+        "n_btree"                    : 0,
+        "n_transaction"              : 0,
+        "n_other"                    : 0,
+        "n_relation"                 : 0,
+        "n_page"                     : 0,
+        "n_distinct_relation"        : 0,
+        "n_distinct_page"            : 0,
+        "n_avg_page_per_relation"    : 0,
+        "n_avg_page_per_transaction" : 0,
+        "n_insert"                   : 0,
+        "n_update"                   : 0,
+        "n_hotupdate"                : 0,
+        "n_delete"                   : 0,
+        "n_commit"                   : 0,
+        "n_abort"                    : 0,
+        "relations"                  : {}
         }
 
     return xlog_stats
 
 def print_xlog_stats(xlog, xlog_stats, args, dbconnection=None):
-    print "XLOG Segment: %s" % (xlog)
-    print "Overall Count:   %d" % xlog_stats["count"]
+    print "XLOG Segment: %s\n" % (xlog)
+    print "Overall Count:   %10d" % xlog_stats["count"]
 
+    # Xlog type statistics
     print "\nXlog Record Types:"
-    print "  Heap:          %d" % xlog_stats["n_heap"]
-    print "  Heap2:         %d" % xlog_stats["n_heap2"]
-    print "  Btree:         %d" % xlog_stats["n_btree"]
-    print "  Other:         %d" % xlog_stats["n_other"]
+    print "  Heap:          %10d" % xlog_stats["n_heap"]
+    print "  Heap2:         %10d" % xlog_stats["n_heap2"]
+    print "  Btree:         %10d" % xlog_stats["n_btree"]
+    print "  Transaction:   %10d" % xlog_stats["n_transaction"]
+    print "  Other:         %10d" % xlog_stats["n_other"]
 
+    # Record type statistics
     print "\nRecord Type:"
-    print "  INSERT:        %d" % xlog_stats["n_insert"]
-    print "  UPDATE:        %d" % xlog_stats["n_update"]
-    print "  HOTUPDATE:     %d" % xlog_stats["n_hotupdate"]
-    print "  DELETE:        %d" % xlog_stats["n_delete"]
+    print "  INSERT:        %10d" % xlog_stats["n_insert"]
+    print "  UPDATE:        %10d" % xlog_stats["n_update"]
+    print "  HOTUPDATE:     %10d" % xlog_stats["n_hotupdate"]
+    print "  DELETE:        %10d" % xlog_stats["n_delete"]
+    print "  COMMIT:        %10d" % xlog_stats["n_commit"]
+    print "  ABORT:         %10d" % xlog_stats["n_abort"]
+
+    # Relation statistics:
+    print "\nRelation:"
+    print "  Total:         %10d" % xlog_stats["n_relation"]
+    print "  Distinct:      %10d" % xlog_stats["n_distinct_relation"]
+
+    # Page statistics:
+    print "\nPage:"
+    print "  Total:         %10d" % xlog_stats["n_page"]
+    print "  Distinct:      %10d" % xlog_stats["n_distinct_page"]
+
+    print "\nPage per Relation:"
+    print "  Average        %10d" % xlog_stats["n_avg_page_per_relation"]
+
+    print "\nPage per Transaction:"
+    print "  Avegage        %10d" % xlog_stats["n_avg_page_per_transaction"]
 
     if args.top_relations:
         print_top_n_relations(\
@@ -96,13 +124,16 @@ def parse_xlogdump_output(output, xlog_stats=None):
 
     relations = xlog_stats["relations"]
 
-    re_heap = re.compile("Heap\ ")
-    re_heap2 = re.compile("Heap2")
-    re_btree = re.compile("Btree")
-    re_insert = re.compile("insert")
+    re_heap = re.compile("\ Heap\ ")
+    re_heap2 = re.compile("\ Heap2")
+    re_btree = re.compile("\ Btree")
+    re_transaction = re.compile("\ Transaction")
+    re_insert = re.compile("\ insert")
     re_update = re.compile("\ update")
-    re_hotupdate = re.compile("hotupdate")
-    re_delete = re.compile("delete")
+    re_hotupdate = re.compile("\ hotupdate")
+    re_delete = re.compile("\ delete")
+    re_commit = re.compile("\ commit")
+    re_abort = re.compile("\ abort")
 
     re_page = re.compile(r'.*rel\ [0-9]*\/[0-9]*\/([0-9]*).*tid\ ([0-9]*).*')
 
@@ -114,6 +145,8 @@ def parse_xlogdump_output(output, xlog_stats=None):
             xlog_stats["n_heap2"] += 1
         if re_btree.search(line):
             xlog_stats["n_btree"] += 1
+        if re_transaction.search(line):
+            xlog_stats["n_transaction"] += 1
         if re_insert.search(line):
             xlog_stats["n_insert"] += 1
         if re_update.search(line):
@@ -122,6 +155,10 @@ def parse_xlogdump_output(output, xlog_stats=None):
             xlog_stats["n_hotupdate"] += 1
         if re_delete.search(line):
             xlog_stats["n_delete"] += 1
+        if re_commit.search(line):
+            xlog_stats["n_commit"] += 1
+        if re_abort.search(line):
+            xlog_stats["n_abort"] += 1
 
         rel_match = re_page.match(line, re.M|re.I)
 
@@ -143,7 +180,16 @@ def parse_xlogdump_output(output, xlog_stats=None):
             relations[relation][page] += 1
 
     xlog_stats["n_other"] = xlog_stats["count"] - \
-            (xlog_stats["n_heap"] + xlog_stats["n_heap2"] + xlog_stats["n_btree"])
+            (xlog_stats["n_heap"] + \
+             xlog_stats["n_heap2"] + \
+             xlog_stats["n_btree"] + \
+             xlog_stats["n_transaction"])
+
+    if xlog_stats["n_distinct_relation"]:
+        xlog_stats["n_avg_page_per_relation"] = \
+                xlog_stats["n_distinct_page"] / xlog_stats["n_distinct_relation"]
+        xlog_stats["n_avg_page_per_transaction"] = \
+                xlog_stats["n_page"] / xlog_stats["n_transaction"]
 
     return xlog_stats
 
@@ -165,17 +211,17 @@ def check_arguments(args):
         #sys.stderr.write("\"%s\" is not a directory" % (args.xlog_path))
         #sys.exit(ERROR_CODES["xlog-path_not_dir"])
 
-    for xlog in args.xlog_segment:
-        if not is_file(xlog):
-            sys.stderr.write("\"%s\" is not a file" % (xlog))
-            sys.exit(ERROR_CODES["xlog-path_not_dir"])
+    if args.xlog_segment:
+        for xlog in args.xlog_segment:
+            if not is_file(xlog):
+                sys.stderr.write("\"%s\" is not a file" % (xlog))
+                sys.exit(ERROR_CODES["xlog-path_not_dir"])
 
 def print_top_n_relations(relations, n, resolve_names=False, dbconnection=None):
     # Get a sorted list of Tuples, ordered by count pages.
     top_n_relations = \
             sorted(relations.items(), key=lambda x: len(x[1]), reverse=True)
 
-    print resolve_names
     print "\nTop %d Relations:" % (n)
 
     if resolve_names:
@@ -223,22 +269,23 @@ def main():
     if args.summary:
         overall_xlog_stats = init_xlog_stats()
 
-    for xlog in args.xlog_segment:
-        if args.xlog_segment:
-            (xlogdump_out, _) = read_xlog_file(xlog, args)
+    if args.xlog_segment:
+        for xlog in args.xlog_segment:
+            if args.xlog_segment:
+                (xlogdump_out, _) = read_xlog_file(xlog, args)
 
-        xlog_stats = parse_xlogdump_output(xlogdump_out) 
+            xlog_stats = parse_xlogdump_output(xlogdump_out) 
 
-        if args.summary:
-            for entry in xlog_stats:
-                if isinstance(overall_xlog_stats[entry], dict):
-                    overall_xlog_stats[entry].update(xlog_stats[entry])
-                else:
-                    overall_xlog_stats[entry] += xlog_stats[entry]
+            if args.summary:
+                for entry in xlog_stats:
+                    if isinstance(overall_xlog_stats[entry], dict):
+                        overall_xlog_stats[entry].update(xlog_stats[entry])
+                    else:
+                        overall_xlog_stats[entry] += xlog_stats[entry]
 
-        print_xlog_stats(xlog, xlog_stats, args, dbconnection)
+            print_xlog_stats(xlog, xlog_stats, args, dbconnection)
 
-        print ""
+            print ""
 
     if args.summary:
         print_xlog_stats(\
