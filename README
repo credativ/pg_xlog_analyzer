@@ -1,0 +1,11 @@
+DESCRIPTION:
+============
+
+Analyzes one ore multiple xlog segments.
+
+REQUIREMENTS:
+=============
+
+Python:
+ - argparse
+ - psycopg2 (optional) - used for resolving relation names
