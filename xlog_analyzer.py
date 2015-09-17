@@ -287,6 +287,8 @@ def main():
             print ""
 
     if args.summary:
+        overall_xlog_stats["n_avg_page_per_relation"] /= len(args.xlog_segment)
+        overall_xlog_stats["n_avg_page_per_transaction"] /= len(args.xlog_segment)
         print_xlog_stats(\
                 "Overall Statistics", overall_xlog_stats, args, dbconnection)
 
