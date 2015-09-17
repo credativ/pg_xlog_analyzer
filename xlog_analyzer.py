@@ -59,6 +59,7 @@ def init_xlog_stats():
         "n_page"                     : 0,
         "n_distinct_relation"        : 0,
         "n_distinct_page"            : 0,
+        "n_bkp"                      : 0,
         "n_avg_page_per_relation"    : 0,
         "n_avg_page_per_transaction" : 0,
         "n_insert"                   : 0,
@@ -102,6 +103,7 @@ def print_xlog_stats(xlog, xlog_stats, args, dbconnection=None):
     print "\nPage:"
     print "  Total:         %10d" % xlog_stats["n_page"]
     print "  Distinct:      %10d" % xlog_stats["n_distinct_page"]
+    print "  Backup Pages:  %10d" % xlog_stats["n_bkp"]
 
     print "\nPage per Relation:"
     print "  Average        %10d" % xlog_stats["n_avg_page_per_relation"]
@@ -135,6 +137,8 @@ def parse_xlogdump_output(output, xlog_stats=None):
     re_abort = re.compile("\ abort")
 
     re_page = re.compile(r'.*rel\ [0-9]*\/[0-9]*\/([0-9]*).*tid\ ([0-9]*).*')
+
+    re_bkp = re.compile(r'.*bkp:\ ([0-9])([0-9])([0-9])([0-9]).*')
 
     for line in output.split("\n"):
         xlog_stats["count"] += 1
@@ -177,6 +181,13 @@ def parse_xlogdump_output(output, xlog_stats=None):
                 xlog_stats["n_distinct_page"] += 1
 
             relations[relation][page] += 1
+
+        bkp_match = re_bkp.match(line, re.M|re.I)
+
+        if bkp_match:
+            for i in range(1, 5):
+                if bkp_match.group(i) == "1":
+                    xlog_stats["n_bkp"] += 1
 
     xlog_stats["n_other"] = xlog_stats["count"] - \
             (xlog_stats["n_heap"] + \
