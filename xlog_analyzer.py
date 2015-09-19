@@ -1,5 +1,13 @@
 #!/usr/bin/env python
 
+"""
+xlog_analyzer - Module for analyzing PostgreSQL xlog segments
+See README for more information.
+
+Upstream source is available at
+https://github.com/credativ/pg_xlog_analyzer/
+"""
+
 import argparse
 import os
 import sys
@@ -16,6 +24,13 @@ ERROR_CODES = {
 
 
 def setup_argparse():
+    """setup_argparse -  define all available command line arguments
+
+    Arguments: None
+
+    Return value: argparse.ArgumentParser
+    """
+
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument('xlog_segment', nargs="*")
     parser.add_argument('--pg_xlogdump', help="path to pg_xlogdump")
@@ -34,6 +49,17 @@ def setup_argparse():
     return parser
 
 def read_xlog_file(file_path, args):
+    """read_xlog_file - reads a xlog segment using pg_xlogdump.
+
+    Arguments:
+        file_path   - file to read (str)
+        args        - command line arguments (dict)
+
+    Return value: Tuple
+        out         - stdout (str)
+        err         - stderr (str)
+    """
+
     cmd = "%s %s" % (args.pg_xlogdump, file_path)
 
     if args.verbose > 2:
@@ -45,6 +71,14 @@ def read_xlog_file(file_path, args):
     return (out, err)
 
 def init_xlog_stats():
+    """init_xlog_stats - initialize xlog_stats dict.
+
+    Arguments: None
+
+    Return Value:
+        xlog_stats  - dict
+    """
+
     xlog_stats = {
         "count"                      : 0,
         "n_heap"                     : 0,
@@ -71,6 +105,17 @@ def init_xlog_stats():
     return xlog_stats
 
 def print_xlog_stats(xlog, xlog_stats, args, dbconnection=None):
+    """print_xlog_stats - prints a xlog_stats in readable format to stdout.
+
+    Arguments:
+        xlog         - filename (str)
+        xlog_stats   - xlog statistics to print (dict)
+        args         - command line arguments (dict)
+        dbconnection - database connection (psycopg2.connection) [default=None]
+
+    Return value: None
+    """
+
     print "XLOG Segment: %s\n" % (xlog)
     print "Overall Count:   %10d" % xlog_stats["count"]
 
@@ -116,6 +161,16 @@ def print_xlog_stats(xlog, xlog_stats, args, dbconnection=None):
                     dbconnection)
 
 def parse_xlogdump_output(output, xlog_stats=None):
+    """parse_xlogdump_output - Takes the output of pg_xlogdump and fills a
+    xlog_stats object.
+
+    Arguments:
+        output     - pg_xlogdump output (str)
+        xlog_stats - xlog_stats (dict) [default: None]
+
+    Return value:
+        xlog_stats - xlog_stats (dict)
+    """
 
     if xlog_stats is None:
         xlog_stats = init_xlog_stats()
@@ -201,15 +256,52 @@ def parse_xlogdump_output(output, xlog_stats=None):
     return xlog_stats
 
 def is_file(file_path):
+    """is_file - check if a given file is existend
+
+    Arguments:
+        file_path - path to file (str)
+
+    Return value:
+        boolean
+    """
+
     return os.path.isfile(file_path)
 
 def is_executable(file_path):
+    """is_executable - check if a given file is existend ans is executable
+
+    Arguments:
+        file_path - path to file (str)
+
+    Return value:
+        boolean
+    """
+
     return is_file(file_path) and os.access(file_path, os.X_OK)
 
 def is_directory(dir_path):
+    """is_directory - check if a given directory exists
+
+    Arguments:
+        dir_path - path to directory (str)
+
+    Return value:
+        boolean
+    """
+
     return os.path.isdir(dir_path)
 
 def check_arguments(args):
+    """check_arguments - checks various command line arguments.
+
+    Exits with error an appropriate error code if some argument doesn't pass the
+    check.
+
+    Arguments:
+        args    - command line arguments (dict)
+
+    Return value: None
+    """
     if args.pg_xlogdump and not is_executable(args.pg_xlogdump):
         sys.stderr.write("\"%s\" is not present or not executable" % (args.pg_xlogdump))
         sys.exit(ERROR_CODES["xlog_not_exe"])
@@ -225,6 +317,19 @@ def check_arguments(args):
                 sys.exit(ERROR_CODES["xlog-path_not_dir"])
 
 def print_top_n_relations(relations, n, resolve_names=False, dbconnection=None):
+    """print_top_n_relations - prints a list (of length n) of relations sorted
+    by pages.
+
+    Arguments:
+        relation      - relations dictionary containing pages (dict)
+        n             - number of relations to return
+        resolve_names - resolve relation names (bool) [default=False]
+        dbconnection  - database connection for resolving relation names
+                        (psycopg2) [default=None]
+
+    Return value: None
+    """
+
     # Get a sorted list of Tuples, ordered by count pages.
     top_n_relations = \
             sorted(relations.items(), key=lambda x: len(x[1]), reverse=True)
@@ -246,6 +351,13 @@ def print_top_n_relations(relations, n, resolve_names=False, dbconnection=None):
             print "  Relation: %s, number of Pages: %d" % (rel, len(pages))
 
 def main():
+    """main - Main function
+
+    Arguments: None
+
+    Return Value: None
+    """
+
     parser = setup_argparse()
     args = parser.parse_args()
 
@@ -281,7 +393,7 @@ def main():
             if args.xlog_segment:
                 (xlogdump_out, _) = read_xlog_file(xlog, args)
 
-            xlog_stats = parse_xlogdump_output(xlogdump_out) 
+            xlog_stats = parse_xlogdump_output(xlogdump_out)
 
             if args.summary:
                 for entry in xlog_stats:
