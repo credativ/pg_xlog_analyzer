@@ -6,7 +6,7 @@ import sys
 import subprocess
 import re
 
-PG_XLOGDUMP = "pg_xlogdump"
+DEFAULT_PG_XLOGDUMP = "pg_xlogdump"
 
 ERROR_CODES = {
         "xlog-segment_not_file" : 1,
@@ -34,7 +34,7 @@ def setup_argparse():
     return parser
 
 def read_xlog_file(file_path, args):
-    cmd = "%s %s" % (PG_XLOGDUMP, file_path)
+    cmd = "%s %s" % (args.pg_xlogdump, file_path)
 
     if args.verbose > 2:
         print "Executing: %s" % (cmd)
@@ -270,8 +270,8 @@ def main():
             connection_string += "user='%s'" % args.user
         dbconnection = psycopg2.connect(connection_string)
 
-    if args.pg_xlogdump:
-        PG_XLOGDUMP = args.pg_xlogdump
+    if not args.pg_xlogdump:
+        args.pg_xlogdump = DEFAULT_PG_XLOGDUMP
 
     if args.summary:
         overall_xlog_stats = init_xlog_stats()
