@@ -122,16 +122,16 @@ def parse_xlogdump_output(output, xlog_stats=None):
 
     relations = xlog_stats["relations"]
 
-    re_heap = re.compile("\ Heap\ ")
-    re_heap2 = re.compile("\ Heap2")
-    re_btree = re.compile("\ Btree")
-    re_transaction = re.compile("\ Transaction")
-    re_insert = re.compile("\ insert")
-    re_update = re.compile("\ update")
-    re_hotupdate = re.compile("\ hotupdate")
-    re_delete = re.compile("\ delete")
-    re_commit = re.compile("\ commit")
-    re_abort = re.compile("\ abort")
+    re_heap = re.compile(r"\ Heap\ ")
+    re_heap2 = re.compile(r"\ Heap2")
+    re_btree = re.compile(r"\ Btree")
+    re_transaction = re.compile(r"\ Transaction")
+    re_insert = re.compile(r"\ insert")
+    re_update = re.compile(r"\ update")
+    re_hotupdate = re.compile(r"\ hotupdate")
+    re_delete = re.compile(r"\ delete")
+    re_commit = re.compile(r"\ commit")
+    re_abort = re.compile(r"\ abort")
 
     re_page = re.compile(r'.*rel\ [0-9]*\/[0-9]*\/([0-9]*).*tid\ ([0-9]*).*')
 
