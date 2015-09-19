@@ -18,8 +18,9 @@ DEFAULT_PG_XLOGDUMP = "pg_xlogdump"
 
 ERROR_CODES = {
     "xlog-segment_not_file" : 1,
-    "xlog-path_not_dir" : 2,
-    "xlog_not_exe" : 3
+    "xlog-path_not_dir"     : 2,
+    "xlog_not_exe"          : 3,
+    "no-database-connecton" : 4
     }
 
 
@@ -47,6 +48,39 @@ def setup_argparse():
 
     parser.add_argument('--help', action='count', help="Print help")
     return parser
+
+def setup_database_connection(args):
+    """setup_database_connection - establish a database connection
+
+    Arguments:
+        args    - command line arguments (dict)
+
+    Return value:
+        dbconnection - a established database connection (psycopg2.Connection)
+    """
+
+    # Because psycopg2 is only required for relation name resolving, we always
+    # import the module if resolving is requested.
+    import psycopg2
+    connection_string = ""
+    dbconnection = None
+
+    # NOTE psycopg2 respects environment variables.
+    if args.dbname:
+        connection_string += "dbname='%s'" % args.dbname
+    if args.host:
+        connection_string += "host='%s'" % args.host
+    if args.port:
+        connection_string += "port='%s'" % args.port
+    if args.user:
+        connection_string += "user='%s'" % args.user
+    try:
+        dbconnection = psycopg2.connect(connection_string)
+    except:
+        print "Could not connect to database"
+        sys.exit(ERROR_CODES["no-database-connection"])
+
+    return dbconnection
 
 def read_xlog_file(file_path, args):
     """read_xlog_file - reads a xlog segment using pg_xlogdump.
@@ -172,6 +206,7 @@ def parse_xlogdump_output(output, xlog_stats=None):
         xlog_stats - xlog_stats (dict)
     """
 
+    # If xlog_stats is None, we need to create a new xlog_stats dict.
     if xlog_stats is None:
         xlog_stats = init_xlog_stats()
 
@@ -217,6 +252,9 @@ def parse_xlogdump_output(output, xlog_stats=None):
 
         rel_match = re_page.match(line, re.M|re.I)
 
+        # If the current line contains a relation entry, we need to add this
+        # relation to our list (if not already present). Moreover we need to add
+        # the related page to our list.
         if rel_match:
             relation = rel_match.group(1)
             page = rel_match.group(2)
@@ -236,17 +274,22 @@ def parse_xlogdump_output(output, xlog_stats=None):
 
         bkp_match = re_bkp.match(line, re.M|re.I)
 
+        # If the current line contains any backup pages (bkp) we need to count
+        # the number of pages (xxxx) where x could ether be 0 or 1.
+        # 1000 means one bkp, 1100 two, and so on.
         if bkp_match:
             for i in range(1, 5):
                 if bkp_match.group(i) == "1":
                     xlog_stats["n_bkp"] += 1
 
+    # We don't track the count every type of xlog entry, instead track "other".
     xlog_stats["n_other"] = xlog_stats["count"] - \
             (xlog_stats["n_heap"] + \
              xlog_stats["n_heap2"] + \
              xlog_stats["n_btree"] + \
              xlog_stats["n_transaction"])
 
+    # AVG values needs to be divided by the appropriate values.
     if xlog_stats["n_distinct_relation"]:
         xlog_stats["n_avg_page_per_relation"] = \
                 xlog_stats["n_distinct_page"] / xlog_stats["n_distinct_relation"]
@@ -334,7 +377,7 @@ def print_top_n_relations(relations, n, resolve_names=False, dbconnection=None):
     Return value: None
     """
 
-    # Get a sorted list of Tuples, ordered by count pages.
+    # Get a sorted list of Tuples, ordered by count pages DESC.
     top_n_relations = \
             sorted(relations.items(), key=lambda x: len(x[1]), reverse=True)
 
@@ -346,6 +389,10 @@ def print_top_n_relations(relations, n, resolve_names=False, dbconnection=None):
     for i, (rel, pages) in enumerate(top_n_relations):
         if i > n:
             break
+        # If name resolving is required we need execute "sql" for each relation.
+        # We only have one database connection. This means we are not able to
+        # resolve relation names for relations not within our database. Because
+        # of this, we always print the relfilenode.
         if resolve_names and not dbconnection is None:
             dbcursor = dbconnection.cursor()
             dbcursor.execute(sql, (rel,))
@@ -373,22 +420,17 @@ def main():
 
     check_arguments(args)
 
+    # If relation name resolving is requested, we need to establish a database
+    # connection.
     if args.resolve_relation_names:
-        import psycopg2
-        connection_string = ""
-        if args.dbname:
-            connection_string += "dbname='%s'" % args.dbname
-        if args.host:
-            connection_string += "host='%s'" % args.host
-        if args.port:
-            connection_string += "port='%s'" % args.port
-        if args.user:
-            connection_string += "user='%s'" % args.user
-        dbconnection = psycopg2.connect(connection_string)
+        dbconnection = setup_database_connection(args)
 
+    # A summary is requested, create a new xlog_stats dict to track the overall
+    # statistics.
     if args.summary:
         overall_xlog_stats = init_xlog_stats()
 
+    # Create and print statistics for each xlog_segment.
     if args.xlog_segment:
         for xlog in args.xlog_segment:
             if args.xlog_segment:
@@ -396,6 +438,9 @@ def main():
 
             xlog_stats = parse_xlogdump_output(xlogdump_out)
 
+            # If a summary is requested, we need to accumulate each xlog_segment
+            # stats into overall_xlog_stats.
+            # NOTE this is wrong for avg values. Avg values are fixed later on.
             if args.summary:
                 for entry in xlog_stats:
                     if isinstance(overall_xlog_stats[entry], dict):
@@ -408,6 +453,7 @@ def main():
             print ""
 
     if args.summary:
+        # NOTE We accumulate avg above, so we need to fix that.
         overall_xlog_stats["n_avg_page_per_relation"] /= len(args.xlog_segment)
         overall_xlog_stats["n_avg_page_per_transaction"] /= len(args.xlog_segment)
         print_xlog_stats(\
