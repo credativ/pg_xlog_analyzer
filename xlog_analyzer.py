@@ -302,19 +302,23 @@ def check_arguments(args):
 
     Return value: None
     """
-    if args.pg_xlogdump and not is_executable(args.pg_xlogdump):
+
+    # If argument pg_xlogdump is not defined we will use the default.
+    if not args.pg_xlogdump:
+        args.pg_xlogdump = DEFAULT_PG_XLOGDUMP
+
+    # If pg_xlogdump is not present (e.g. not in path) or not executable we need
+    # to bail out.
+    if not is_executable(args.pg_xlogdump):
         sys.stderr.write("\"%s\" is not present or not executable" % (args.pg_xlogdump))
         sys.exit(ERROR_CODES["xlog_not_exe"])
 
-    #if args.xlog_path and not is_directory(args.xlog_path):
-        #sys.stderr.write("\"%s\" is not a directory" % (args.xlog_path))
-        #sys.exit(ERROR_CODES["xlog-path_not_dir"])
-
+    # We need to check each segment before we start to work.
     if args.xlog_segment:
         for xlog in args.xlog_segment:
             if not is_file(xlog):
                 sys.stderr.write("\"%s\" is not a file" % (xlog))
-                sys.exit(ERROR_CODES["xlog-path_not_dir"])
+                sys.exit(ERROR_CODES["xlog-segment_not_file"])
 
 def print_top_n_relations(relations, n, resolve_names=False, dbconnection=None):
     """print_top_n_relations - prints a list (of length n) of relations sorted
@@ -381,9 +385,6 @@ def main():
         if args.user:
             connection_string += "user='%s'" % args.user
         dbconnection = psycopg2.connect(connection_string)
-
-    if not args.pg_xlogdump:
-        args.pg_xlogdump = DEFAULT_PG_XLOGDUMP
 
     if args.summary:
         overall_xlog_stats = init_xlog_stats()
