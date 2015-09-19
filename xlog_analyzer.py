@@ -9,9 +9,9 @@ import re
 DEFAULT_PG_XLOGDUMP = "pg_xlogdump"
 
 ERROR_CODES = {
-        "xlog-segment_not_file" : 1,
-        "xlog-path_not_dir" : 2,
-        "xlog_not_exe" : 3
+    "xlog-segment_not_file" : 1,
+    "xlog-path_not_dir" : 2,
+    "xlog_not_exe" : 3
     }
 
 
