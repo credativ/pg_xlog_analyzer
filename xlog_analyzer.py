@@ -33,9 +33,6 @@ def setup_argparse():
     parser.add_argument('--help', action='count', help="Print help")
     return parser
 
-def parse_arguments(args):
-    pass
-
 def read_xlog_file(file_path, args):
     cmd = "%s %s" % (PG_XLOGDUMP, file_path)
 
